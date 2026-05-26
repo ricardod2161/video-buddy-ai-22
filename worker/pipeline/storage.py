@@ -1,16 +1,16 @@
 """Upload para Supabase Storage e callback assinado para o app."""
 from __future__ import annotations
-import os
 import json
 import hmac
 import hashlib
 import httpx
 from pathlib import Path
 from supabase import create_client, Client
+from .env import env_required
 
 
 def supabase() -> Client:
-    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+    return create_client(env_required("SUPABASE_URL"), env_required("SUPABASE_SERVICE_ROLE_KEY"))
 
 
 def upload_clip(local: Path, user_id: str, project_id: str, name: str) -> str:
@@ -29,7 +29,7 @@ def callback(url: str | None, payload: dict) -> None:
     if not url:
         print("[callback] skipped (no callback_url):", payload.get("event"))
         return
-    secret = os.environ["WORKER_SECRET"]
+    secret = env_required("WORKER_SECRET")
     body = json.dumps(payload, separators=(",", ":"))
     sig = hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
     try:
