@@ -47,8 +47,8 @@ export const createProject = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context;
 
-    // 1) consome 1 crédito (RLS-safe, via RPC do próprio usuário)
-    const { error: credErr } = await supabase.rpc("consume_credit");
+    // 1) consome 1 crédito server-side (service-role, user id verified pelo middleware)
+    const { error: credErr } = await supabaseAdmin.rpc("consume_credit", { _user_id: userId });
     if (credErr) {
       throw new Error(credErr.message === "no_credits" ? "Sem créditos." : credErr.message);
     }
