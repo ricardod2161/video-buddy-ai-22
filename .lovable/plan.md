@@ -1,86 +1,51 @@
+## Página de Créditos
 
-# Redesign do Dashboard — SaaS Dark + Roxo
+Criar nova rota `/credits` (protegida) com saldo, histórico de uso e botão de compra.
 
-Vou refatorar o `/dashboard` num layout SaaS com sidebar fixa, header rico e tabela de vídeos, mantendo toda a lógica atual de upload, créditos e Realtime intactas.
+### 1. Rota e navegação
+- Novo arquivo `src/routes/_authenticated.credits.tsx` (autoprotegida pelo layout `_authenticated`).
+- Atualizar `src/components/app-sidebar.tsx`: item "Créditos" passa a ser `enabled: true` com `url: "/credits"` (hoje está desabilitado).
+- `head()` com title/description próprios.
 
-## Mudanças visuais (design tokens)
+### 2. Layout da página
+Reutiliza o mesmo shell do dashboard (SidebarProvider + AppSidebar + header com `CreditsBadge` + `UserMenu`). Conteúdo principal em três seções:
 
-- Trocar accent atual (verde-lima) por **roxo `#7C3AED`** no `src/styles.css`:
-  - `--primary` → roxo, `--ring` → roxo, ajustar `--primary-foreground` para branco.
-  - Manter o restante do tema dark near-black.
-- Status colors via tokens semânticos já existentes (`success`, `warning`, `destructive`) ajustados:
-  - pending → `muted` (cinza)
-  - processing → `warning` (âmbar) + `animate-pulse`
-  - completed → `success` (verde)
-  - failed → `destructive` (vermelho)
+**a) Card "Saldo atual"**
+- Lê `user_credits.amount` via TanStack Query (mesma `queryKey: ["credits"]` do dashboard — reaproveita cache).
+- Exibe número grande em destaque, com skeleton no loading.
+- Botão primário **"Comprar créditos"** ao lado.
 
-## Estrutura de layout
+**b) Card "Comprar créditos"** (mock por enquanto)
+- Mostra 3 pacotes sugeridos (ex: 10 / 50 / 200 créditos) em cards selecionáveis.
+- Botão "Ir para checkout" → ver seção 3.
 
-```text
-┌────────────┬──────────────────────────────────────────┐
-│            │  Header: [créditos badge] [avatar ▾]     │
-│  Sidebar   ├──────────────────────────────────────────┤
-│  ├ Home    │                                          │
-│  ├ Vídeos  │   Dropzone (com barra de progresso)      │
-│  ├ Crédit. │                                          │
-│  └ Config. │   Tabela: Nome | Status | Data | Ações   │
-│            │                                          │
-└────────────┴──────────────────────────────────────────┘
-```
+**c) Tabela "Histórico de uso"**
+- Query na tabela `videos` (mesma RLS já filtra por usuário): `select id, original_url, created_at, status`.
+- Colunas: **Data**, **Vídeo** (nome do arquivo), **Status** (reusa `StatusBadge`), **Créditos consumidos** (fixo `−1` por linha, já que cada upload consome 1 crédito via `consume_credit()`).
+- Skeleton screens no loading, estado vazio amigável.
+- Ordem: `created_at desc`.
 
-### Sidebar
-- Usar `shadcn/ui Sidebar` (`collapsible="icon"`) — já listado nas dependências do template.
-- Itens: Home, Vídeos, Créditos, Configurações (ícones lucide: `Home`, `Video`, `Coins`, `Settings`).
-- Por enquanto só Vídeos/Home têm rota real; os outros itens ficam como placeholder (`#`) com tooltip "Em breve" — sem criar rotas novas para não sair do escopo do redesign.
-- Novo `src/components/app-sidebar.tsx`.
+### 3. Botão "Comprar créditos" → Stripe Checkout
 
-### Header
-- Badge de créditos restantes (chip arredondado, ícone `Coins`, número grande, cor roxa quando >0, vermelha quando 0).
-- Avatar (`shadcn DropdownMenu` + `Avatar`) com iniciais do email. Menu: email, separador, **Sair** (chama `supabase.auth.signOut`).
+**Importante:** o projeto ainda não tem Stripe configurado. Precisa decidir o caminho antes de eu implementar:
 
-### Dropzone com progresso
-- Substituir `<label>` atual por dropzone real com drag handlers (`onDragOver` / `onDrop`).
-- Barra de progresso animada usando o `onUploadProgress`-equivalente do Supabase Storage: usar `upload()` com a opção `duplex` + medir via XHR não está disponível na SDK; vou usar um **progresso simulado** suave (de 0→90% durante upload, salta para 100% ao terminar) — feedback visual claro sem dependência de API não suportada. Componente: `<Progress>` do shadcn (roxo).
-- Estados: idle / dragging (borda roxa + glow) / uploading (barra) / success (flash verde).
+- **Opção A (recomendada — Lovable Payments):** ativar pagamentos integrados via Stripe pela Lovable (`enable_stripe_payments`). Não exige conta Stripe nem chave API, ambiente de teste é criado automaticamente. Eu então crio os produtos (pacotes de crédito) e o server function de checkout.
+- **Opção B (BYOK):** você fornece sua própria `STRIPE_SECRET_KEY`; eu crio um server function `createCheckoutSession` que chama a API do Stripe e devolve a URL.
+- **Opção C (stub agora):** botão fica desabilitado com tooltip "em breve" e implementamos checkout numa próxima etapa. A página de Créditos (saldo + histórico) é entregue mesmo assim.
 
-### Tabela
-- `shadcn Table`: colunas **Nome**, **Status**, **Data**, **Ações**.
-- Status: componente `<StatusBadge status={...} />` retornando `<Badge>` com classes condicionais e ícone (`Clock`/`Loader2`/`CheckCircle2`/`XCircle`).
-- Ações: botão **Download** (`<Button variant="outline" size="sm">`) com `disabled={status !== "completed" || !output_url}`. Link abre `output_url` em nova aba.
-- Nome = arquivo extraído de `original_url` (`split("/").pop()`).
-- Data formatada `pt-BR`.
+A creditação após pagamento (webhook → incrementa `user_credits.amount`) fica fora do escopo deste plano e entra na etapa do checkout.
 
-### Skeleton screens
-- Enquanto `videos.isLoading` ou `credits.isLoading`: renderizar `<Skeleton>` (shadcn) — 5 linhas na tabela e barras no badge de créditos.
-- Substitui o "Carregando…" textual atual.
+### 4. Fora do escopo
+- Tabela separada de transações/ledger (por ora derivamos histórico de `videos`).
+- Webhook Stripe e fulfilment de créditos.
+- Reembolso / créditos expirados.
 
-## Comportamento (preservado)
+### Arquivos
+- **Novo:** `src/routes/_authenticated.credits.tsx`
+- **Novo:** `src/components/credits/purchase-card.tsx` (pacotes)
+- **Novo:** `src/components/credits/usage-table.tsx`
+- **Editado:** `src/components/app-sidebar.tsx` (habilita item Créditos)
 
-- Upload: mesmo fluxo atual (`storage.upload` → `rpc("consume_credit")` → `insert videos` → `triggerProcessing`).
-- Realtime: mesma subscription em `videos` filtrada por `user_id`.
-- Erros: `toast` (sonner) como hoje.
-- Sem mudanças em DB, server functions ou auth.
+---
 
-## Arquivos
-
-**Novos**
-- `src/components/app-sidebar.tsx` — sidebar com 4 itens
-- `src/components/dashboard/credits-badge.tsx`
-- `src/components/dashboard/user-menu.tsx` (avatar + dropdown)
-- `src/components/dashboard/upload-dropzone.tsx` (drag&drop + progresso)
-- `src/components/dashboard/videos-table.tsx`
-- `src/components/dashboard/status-badge.tsx`
-
-**Editados**
-- `src/routes/_authenticated.dashboard.tsx` — passa a orquestrar os componentes acima dentro do `SidebarProvider`
-- `src/styles.css` — troca `--primary` para roxo `#7C3AED` (oklch equivalente)
-
-**Dependências shadcn**: verificar/instalar via CLI shadcn se faltarem `sidebar`, `dropdown-menu`, `avatar`, `table`, `progress`, `skeleton`, `badge`, `button`, `tooltip`.
-
-## Fora do escopo
-
-- Criar rotas reais para Créditos / Configurações (item de menu fica como placeholder).
-- Mexer em login, server functions, schema ou triggerProcessing.
-- Player de vídeo / preview no clique.
-
-Confirmar?
+**Antes de implementar:** qual opção para o botão de checkout — **A (Lovable Payments)**, **B (sua chave Stripe)** ou **C (stub por enquanto)**?

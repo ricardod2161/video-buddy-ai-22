@@ -15,7 +15,7 @@ import {
 const items = [
   { title: "Home", url: "/", icon: Home, enabled: true },
   { title: "Vídeos", url: "/dashboard", icon: Video, enabled: true },
-  { title: "Créditos", url: "#credits", icon: Coins, enabled: false },
+  { title: "Créditos", url: "/credits", icon: Coins, enabled: true },
   { title: "Configurações", url: "#settings", icon: Settings, enabled: false },
 ];
 
