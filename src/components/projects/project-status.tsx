@@ -35,5 +35,18 @@ export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
 
 export function ProjectProgress({ status, progress }: { status: ProjectStatus; progress: number }) {
   if (status === "done" || status === "failed") return null;
-  return <Progress value={progress} className="h-1.5" />;
+  const pct = Math.max(0, Math.min(100, Math.round(progress ?? 0)));
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Progresso
+        </span>
+        <span className="font-mono text-[10px] font-semibold text-primary tabular-nums">
+          {pct}%
+        </span>
+      </div>
+      <Progress value={pct} className="h-1.5" />
+    </div>
+  );
 }
