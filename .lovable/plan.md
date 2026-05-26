@@ -1,79 +1,86 @@
-## Objetivo
 
-Entregar Módulo A + B + disparo do processamento (sem o FastAPI ainda), usando Lovable Cloud + TanStack Start. Substituo a Edge Function do diagrama por um **TanStack server function** chamado logo após o insert do vídeo — mesmo runtime do app, sem stack paralela. Quando o BACKEND_URL existir, é só preencher o secret e o disparo passa a funcionar; até lá, o vídeo fica em `pending` (você pode marcar manualmente para testar realtime).
+# Redesign do Dashboard — SaaS Dark + Roxo
 
-## Stack e decisões-chave
+Vou refatorar o `/dashboard` num layout SaaS com sidebar fixa, header rico e tabela de vídeos, mantendo toda a lógica atual de upload, créditos e Realtime intactas.
 
-- **Cloud (Supabase gerenciado)** para Auth, DB, Storage e Realtime.
-- **Auth:** email/senha + Google (padrão Cloud). Sem tabela `profiles` (não foi pedida).
-- **Sem Edge Functions do Supabase.** O disparo vira um `createServerFn` no TanStack — é o padrão recomendado pelo stack atual.
-- **Sem DB webhook / pg_net.** Mais simples e mais visível: chamamos o disparador logo após o insert, do lado cliente, dentro do mesmo fluxo do upload.
-- **Realtime** na lista de vídeos: a UI atualiza sozinha quando o FastAPI marcar `status=completed`.
+## Mudanças visuais (design tokens)
 
-## Schema (ajustes sobre o seu SQL)
+- Trocar accent atual (verde-lima) por **roxo `#7C3AED`** no `src/styles.css`:
+  - `--primary` → roxo, `--ring` → roxo, ajustar `--primary-foreground` para branco.
+  - Manter o restante do tema dark near-black.
+- Status colors via tokens semânticos já existentes (`success`, `warning`, `destructive`) ajustados:
+  - pending → `muted` (cinza)
+  - processing → `warning` (âmbar) + `animate-pulse`
+  - completed → `success` (verde)
+  - failed → `destructive` (vermelho)
 
-Migration única, com correções de segurança que o seu SQL original não tem:
+## Estrutura de layout
 
-- `user_credits(user_id PK → auth.users, amount int default 10, updated_at)`
-  - Trigger `on_auth_user_created` cria 10 créditos ao registrar.
-  - `SECURITY DEFINER` da função com `SET search_path = public` (evita CVE clássica de search_path).
-  - RLS: policies separadas para `SELECT` e `UPDATE`, ambas `auth.uid() = user_id`. **Sem INSERT/DELETE pelo cliente** (só o trigger cria).
-- `videos(id, user_id, original_url, output_url, status default 'pending', error_msg, clips_data jsonb, created_at)`
-  - Index `(user_id, status)`.
-  - RLS: `SELECT` e `INSERT` por `auth.uid() = user_id`. `UPDATE/DELETE` negados ao cliente (só backend via service_role atualiza status/output).
-- `GRANT SELECT, INSERT, UPDATE ON public.user_credits TO authenticated;`
-  `GRANT SELECT, INSERT ON public.videos TO authenticated;`
-  `GRANT ALL ... TO service_role;` (obrigatório — sem isso o PostgREST devolve permission denied mesmo com RLS).
-- **Storage bucket privado** `videos-input` com policies: usuário só lê/escreve dentro de `videos-input/{auth.uid()}/...`.
+```text
+┌────────────┬──────────────────────────────────────────┐
+│            │  Header: [créditos badge] [avatar ▾]     │
+│  Sidebar   ├──────────────────────────────────────────┤
+│  ├ Home    │                                          │
+│  ├ Vídeos  │   Dropzone (com barra de progresso)      │
+│  ├ Crédit. │                                          │
+│  └ Config. │   Tabela: Nome | Status | Data | Ações   │
+│            │                                          │
+└────────────┴──────────────────────────────────────────┘
+```
 
-## Módulos a construir
+### Sidebar
+- Usar `shadcn/ui Sidebar` (`collapsible="icon"`) — já listado nas dependências do template.
+- Itens: Home, Vídeos, Créditos, Configurações (ícones lucide: `Home`, `Video`, `Coins`, `Settings`).
+- Por enquanto só Vídeos/Home têm rota real; os outros itens ficam como placeholder (`#`) com tooltip "Em breve" — sem criar rotas novas para não sair do escopo do redesign.
+- Novo `src/components/app-sidebar.tsx`.
 
-**Módulo A — Auth + Dashboard**
-- Rotas: `/` (landing simples), `/login`, `/_authenticated/dashboard`.
-- Layout `_authenticated.tsx` faz o guard via `context.auth.isAuthenticated`.
-- Dashboard mostra: créditos restantes, botão de upload, lista de vídeos do usuário com badge de status.
+### Header
+- Badge de créditos restantes (chip arredondado, ícone `Coins`, número grande, cor roxa quando >0, vermelha quando 0).
+- Avatar (`shadcn DropdownMenu` + `Avatar`) com iniciais do email. Menu: email, separador, **Sair** (chama `supabase.auth.signOut`).
 
-**Módulo B — Upload → Storage → insert pending → disparo**
-- Componente de upload (drag & drop, mp4/mov, limite de tamanho).
-- Fluxo no clique:
-  1. Upload do arquivo para `videos-input/{user_id}/{uuid}.mp4`.
-  2. `INSERT` em `videos` com `status='pending'` e `original_url` = caminho no Storage.
-  3. Decrementa 1 crédito (RPC `consume_credit()` `SECURITY DEFINER`, atômico, falha se `amount <= 0`).
-  4. Chama `triggerProcessing({ jobId })` (server fn — ver abaixo).
-- Lista de vídeos com **Supabase Realtime** filtrado por `user_id`: status muda de `pending` → `processing` → `completed/failed` sem refresh.
+### Dropzone com progresso
+- Substituir `<label>` atual por dropzone real com drag handlers (`onDragOver` / `onDrop`).
+- Barra de progresso animada usando o `onUploadProgress`-equivalente do Supabase Storage: usar `upload()` com a opção `duplex` + medir via XHR não está disponível na SDK; vou usar um **progresso simulado** suave (de 0→90% durante upload, salta para 100% ao terminar) — feedback visual claro sem dependência de API não suportada. Componente: `<Progress>` do shadcn (roxo).
+- Estados: idle / dragging (borda roxa + glow) / uploading (barra) / success (flash verde).
 
-**Disparo do processamento (substitui a Edge Function)**
-- `src/lib/processing.functions.ts` — `triggerProcessing` `createServerFn` POST, protegido por `requireSupabaseAuth`.
-- Dentro do handler:
-  - Valida que o `videos.id` pertence ao `userId` (via `supabaseAdmin`).
-  - Lê `process.env.BACKEND_URL` e `process.env.SHARED_SECRET` (apenas dentro do handler — nunca em escopo de módulo).
-  - Se ausentes → retorna `{ queued: false, reason: "backend_not_configured" }` e deixa o vídeo em `pending`. App segue funcionando.
-  - Se presentes → `fetch(BACKEND_URL + '/process', { headers: { 'x-secret': SHARED_SECRET }, body: { job_id, file_url (signed URL 1h), user_id } })`.
-- O FastAPI, quando existir, atualiza `videos.status/output_url/error_msg` via service_role; a UI recebe via Realtime.
+### Tabela
+- `shadcn Table`: colunas **Nome**, **Status**, **Data**, **Ações**.
+- Status: componente `<StatusBadge status={...} />` retornando `<Badge>` com classes condicionais e ícone (`Clock`/`Loader2`/`CheckCircle2`/`XCircle`).
+- Ações: botão **Download** (`<Button variant="outline" size="sm">`) com `disabled={status !== "completed" || !output_url}`. Link abre `output_url` em nova aba.
+- Nome = arquivo extraído de `original_url` (`split("/").pop()`).
+- Data formatada `pt-BR`.
 
-## Secrets
+### Skeleton screens
+- Enquanto `videos.isLoading` ou `credits.isLoading`: renderizar `<Skeleton>` (shadcn) — 5 linhas na tabela e barras no badge de créditos.
+- Substitui o "Carregando…" textual atual.
 
-Quando o FastAPI estiver pronto, peço via tool de secrets:
-- `BACKEND_URL` (ex.: `https://seu-app.up.railway.app`)
-- `SHARED_SECRET` (token compartilhado para o header `x-secret`)
+## Comportamento (preservado)
 
-Não precisa agora — o app já roda com `pending` e dá pra testar o Realtime atualizando o status manualmente no Cloud.
+- Upload: mesmo fluxo atual (`storage.upload` → `rpc("consume_credit")` → `insert videos` → `triggerProcessing`).
+- Realtime: mesma subscription em `videos` filtrada por `user_id`.
+- Erros: `toast` (sonner) como hoje.
+- Sem mudanças em DB, server functions ou auth.
 
-## Detalhes técnicos relevantes
+## Arquivos
 
-- **Bearer attacher**: garantir que `src/start.ts` registra `attachSupabaseAuth` em `functionMiddleware` (necessário para `requireSupabaseAuth` no `triggerProcessing`).
-- **`onAuthStateChange`** no `__root.tsx` chama `router.invalidate()` + `queryClient.invalidateQueries()` (evita dados do user anterior após logout).
-- **Realtime**: `supabase.channel('videos:user='+uid).on('postgres_changes', { event: '*', schema: 'public', table: 'videos', filter: 'user_id=eq.'+uid }, ...)` no componente da lista; cleanup no unmount.
-- **Signed URL** para o FastAPI baixar o arquivo: gerada com `supabaseAdmin.storage.from('videos-input').createSignedUrl(path, 3600)` dentro do server fn.
-- **Idempotência**: o próprio FastAPI já trata (seu código). Do lado Lovable, só não chamamos `triggerProcessing` de novo se o vídeo já existe.
+**Novos**
+- `src/components/app-sidebar.tsx` — sidebar com 4 itens
+- `src/components/dashboard/credits-badge.tsx`
+- `src/components/dashboard/user-menu.tsx` (avatar + dropdown)
+- `src/components/dashboard/upload-dropzone.tsx` (drag&drop + progresso)
+- `src/components/dashboard/videos-table.tsx`
+- `src/components/dashboard/status-badge.tsx`
 
-## O que NÃO vai entrar agora
+**Editados**
+- `src/routes/_authenticated.dashboard.tsx` — passa a orquestrar os componentes acima dentro do `SidebarProvider`
+- `src/styles.css` — troca `--primary` para roxo `#7C3AED` (oklch equivalente)
 
-- Módulo D (billing, histórico, upgrade) — fica para depois.
-- Player modal com download — entrego um link “Baixar” simples; modal/player completo pode vir num próximo passo.
-- Email templates customizados, password reset UI — fluxo padrão Supabase.
-- O próprio FastAPI / pipeline de FFmpeg/Whisper/ElevenLabs (fora do Lovable; vive no Railway).
+**Dependências shadcn**: verificar/instalar via CLI shadcn se faltarem `sidebar`, `dropdown-menu`, `avatar`, `table`, `progress`, `skeleton`, `badge`, `button`, `tooltip`.
 
-## Direção visual
+## Fora do escopo
 
-Sem especificação sua, vou de **tech minimal escuro** (fundo near-black, 1 accent vibrante, tipografia geométrica), apropriado pra ferramenta de processamento de vídeo. Se quiser direções alternativas pra escolher antes de eu construir, me avisa que eu gero 2-3 opções.
+- Criar rotas reais para Créditos / Configurações (item de menu fica como placeholder).
+- Mexer em login, server functions, schema ou triggerProcessing.
+- Player de vídeo / preview no clique.
+
+Confirmar?

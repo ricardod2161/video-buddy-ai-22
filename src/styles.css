@@ -49,8 +49,9 @@
   --popover: oklch(0.20 0.014 250);
   --popover-foreground: oklch(0.97 0.005 250);
 
-  --primary: oklch(0.87 0.22 135);
-  --primary-foreground: oklch(0.18 0.02 135);
+  /* Roxo #7C3AED */
+  --primary: oklch(0.55 0.24 295);
+  --primary-foreground: oklch(0.99 0 0);
 
   --secondary: oklch(0.26 0.018 250);
   --secondary-foreground: oklch(0.97 0.005 250);
@@ -72,7 +73,7 @@
 
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.87 0.22 135);
+  --ring: oklch(0.55 0.24 295);
 }
 
 .dark {
