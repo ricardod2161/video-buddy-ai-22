@@ -15,7 +15,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedCreditsRouteImport } from './routes/_authenticated.credits'
 import { Route as ApiPublicWorkerCallbackRouteImport } from './routes/api/public/worker-callback'
-import { Route as ApiPublicRevealLovableKeyRouteImport } from './routes/api/public/reveal-lovable-key'
 import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated.projects.$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -47,12 +46,6 @@ const ApiPublicWorkerCallbackRoute = ApiPublicWorkerCallbackRouteImport.update({
   path: '/api/public/worker-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicRevealLovableKeyRoute =
-  ApiPublicRevealLovableKeyRouteImport.update({
-    id: '/api/public/reveal-lovable-key',
-    path: '/api/public/reveal-lovable-key',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
   id: '/projects/$id',
   path: '/projects/$id',
@@ -65,7 +58,6 @@ export interface FileRoutesByFullPath {
   '/credits': typeof AuthenticatedCreditsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
-  '/api/public/reveal-lovable-key': typeof ApiPublicRevealLovableKeyRoute
   '/api/public/worker-callback': typeof ApiPublicWorkerCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -74,7 +66,6 @@ export interface FileRoutesByTo {
   '/credits': typeof AuthenticatedCreditsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/projects/$id': typeof AuthenticatedProjectsIdRoute
-  '/api/public/reveal-lovable-key': typeof ApiPublicRevealLovableKeyRoute
   '/api/public/worker-callback': typeof ApiPublicWorkerCallbackRoute
 }
 export interface FileRoutesById {
@@ -85,7 +76,6 @@ export interface FileRoutesById {
   '/_authenticated/credits': typeof AuthenticatedCreditsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
-  '/api/public/reveal-lovable-key': typeof ApiPublicRevealLovableKeyRoute
   '/api/public/worker-callback': typeof ApiPublicWorkerCallbackRoute
 }
 export interface FileRouteTypes {
@@ -96,7 +86,6 @@ export interface FileRouteTypes {
     | '/credits'
     | '/dashboard'
     | '/projects/$id'
-    | '/api/public/reveal-lovable-key'
     | '/api/public/worker-callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -105,7 +94,6 @@ export interface FileRouteTypes {
     | '/credits'
     | '/dashboard'
     | '/projects/$id'
-    | '/api/public/reveal-lovable-key'
     | '/api/public/worker-callback'
   id:
     | '__root__'
@@ -115,7 +103,6 @@ export interface FileRouteTypes {
     | '/_authenticated/credits'
     | '/_authenticated/dashboard'
     | '/_authenticated/projects/$id'
-    | '/api/public/reveal-lovable-key'
     | '/api/public/worker-callback'
   fileRoutesById: FileRoutesById
 }
@@ -123,7 +110,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
-  ApiPublicRevealLovableKeyRoute: typeof ApiPublicRevealLovableKeyRoute
   ApiPublicWorkerCallbackRoute: typeof ApiPublicWorkerCallbackRoute
 }
 
@@ -171,13 +157,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWorkerCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/reveal-lovable-key': {
-      id: '/api/public/reveal-lovable-key'
-      path: '/api/public/reveal-lovable-key'
-      fullPath: '/api/public/reveal-lovable-key'
-      preLoaderRoute: typeof ApiPublicRevealLovableKeyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated/projects/$id': {
       id: '/_authenticated/projects/$id'
       path: '/projects/$id'
@@ -208,9 +187,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
-  ApiPublicRevealLovableKeyRoute: ApiPublicRevealLovableKeyRoute,
   ApiPublicWorkerCallbackRoute: ApiPublicWorkerCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

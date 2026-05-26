@@ -97,7 +97,7 @@ function ProjectDetail() {
   useEffect(() => {
     if (!userId) return;
     const ch = supabase
-      .channel(`project:${id}`)
+      .channel(`project:${id}:${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter: `id=eq.${id}` },
         () => qc.invalidateQueries({ queryKey: ["project", id] }))
       .on("postgres_changes", { event: "*", schema: "public", table: "clips", filter: `project_id=eq.${id}` },
