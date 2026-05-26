@@ -1,8 +1,8 @@
 """Transcrição com timestamps por palavra (faster-whisper)."""
 from __future__ import annotations
-import os
 from pathlib import Path
 from faster_whisper import WhisperModel
+from .env import env
 
 _model: WhisperModel | None = None
 
@@ -10,7 +10,7 @@ _model: WhisperModel | None = None
 def _get_model() -> WhisperModel:
     global _model
     if _model is None:
-        size = os.environ.get("WHISPER_MODEL", "small")
+        size = env("WHISPER_MODEL", "small") or "small"
         _model = WhisperModel(size, device="cpu", compute_type="int8")
     return _model
 

@@ -1,8 +1,8 @@
 """Seleção de clipes via Lovable AI Gateway (Gemini 3 Flash + tool calling)."""
 from __future__ import annotations
-import os
 import json
 import httpx
+from .env import env_required
 
 GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions"
 MODEL = "google/gemini-3-flash-preview"
@@ -15,7 +15,7 @@ Devolva entre 5 e {max_clips} clipes, ordenados por potencial viral (maior score
 
 
 def select_clips(transcript: dict, max_clips: int = 10) -> list[dict]:
-    key = os.environ["LOVABLE_API_KEY"]
+    key = env_required("LOVABLE_API_KEY")
     # compacta a transcrição: 1 linha por segmento
     lines = [f"[{s['start']:.1f}-{s['end']:.1f}] {s['text']}" for s in transcript["segments"]]
     transcript_text = "\n".join(lines)

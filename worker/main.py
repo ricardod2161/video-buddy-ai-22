@@ -14,10 +14,11 @@ from pipeline.transcribe import transcribe
 from pipeline.select import select_clips
 from pipeline.render import render_clip, ASPECT
 from pipeline.storage import upload_clip, callback, supabase
+from pipeline.env import env
 
 app = FastAPI()
 
-MAX_CLIPS = int(os.environ.get("MAX_CLIPS", "10"))
+MAX_CLIPS = int(env("MAX_CLIPS", "10") or "10")
 
 
 def _verify_signature(secret: str, body: bytes, sig: str | None) -> bool:
@@ -37,7 +38,7 @@ def health():
 
 @app.post("/process")
 async def process(request: Request, bg: BackgroundTasks):
-    secret = os.environ.get("WORKER_SECRET")
+    secret = env("WORKER_SECRET")
     if not secret:
         raise HTTPException(500, "WORKER_SECRET not set")
     raw = await request.body()
