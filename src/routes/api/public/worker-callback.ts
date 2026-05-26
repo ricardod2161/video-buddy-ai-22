@@ -60,8 +60,14 @@ export const Route = createFileRoute("/api/public/worker-callback")({
         let parsed: z.infer<typeof Payload>;
         try { parsed = Payload.parse(JSON.parse(body)); }
         catch (err) {
-          return new Response(err instanceof Error ? err.message : "invalid", { status: 400 });
+          console.error("[worker-callback] invalid payload:", err instanceof Error ? err.message : err);
+          return new Response("invalid_payload", { status: 400 });
         }
+
+        const fail = (where: string, error: { message: string }) => {
+          console.error(`[worker-callback] db error (${where}):`, error.message);
+          return new Response("internal_error", { status: 500 });
+        };
 
         if (parsed.event === "project_progress") {
           const update: {
@@ -77,7 +83,7 @@ export const Route = createFileRoute("/api/public/worker-callback")({
           if (parsed.error_msg) update.error_msg = parsed.error_msg;
           const { error } = await supabaseAdmin
             .from("projects").update(update).eq("id", parsed.project_id);
-          if (error) return new Response(error.message, { status: 500 });
+          if (error) return fail("project_progress", error);
         } else if (parsed.event === "clips_ready") {
           const rows = parsed.clips.map((c) => ({
             project_id: parsed.project_id,
@@ -91,20 +97,21 @@ export const Route = createFileRoute("/api/public/worker-callback")({
             virality_reason: c.virality_reason ?? null,
           }));
           const { error } = await supabaseAdmin.from("clips").insert(rows);
-          if (error) return new Response(error.message, { status: 500 });
+          if (error) return fail("clips_ready", error);
         } else if (parsed.event === "render_done") {
           const { error } = await supabaseAdmin
             .from("clip_renders")
             .update({ status: "done", output_url: parsed.output_url, error_msg: null })
             .eq("id", parsed.render_id);
-          if (error) return new Response(error.message, { status: 500 });
+          if (error) return fail("render_done", error);
         } else {
           const { error } = await supabaseAdmin
             .from("clip_renders")
             .update({ status: "failed", error_msg: parsed.error_msg })
             .eq("id", parsed.render_id);
-          if (error) return new Response(error.message, { status: 500 });
+          if (error) return fail("render_failed", error);
         }
+
 
         return new Response("ok");
       },
