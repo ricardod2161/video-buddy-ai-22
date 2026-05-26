@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -7,10 +7,10 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/app-sidebar";
 import { CreditsBadge } from "@/components/dashboard/credits-badge";
 import { UserMenu } from "@/components/dashboard/user-menu";
-import { UploadDropzone } from "@/components/dashboard/upload-dropzone";
-import { VideosTable, type VideoRow } from "@/components/dashboard/videos-table";
+import { UrlInput } from "@/components/projects/url-input";
+import { ProjectsList, type ProjectRow } from "@/components/projects/projects-list";
 import { supabase } from "@/integrations/supabase/client";
-import { triggerProcessing } from "@/lib/processing.functions";
+import { createProject } from "@/lib/projects.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -19,7 +19,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function Dashboard() {
   const qc = useQueryClient();
-  const trigger = useServerFn(triggerProcessing);
+  const navigate = useNavigate();
+  const create = useServerFn(createProject);
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
 
@@ -40,77 +41,50 @@ function Dashboard() {
     },
   });
 
-  const videos = useQuery({
-    queryKey: ["videos"],
+  const projects = useQuery({
+    queryKey: ["projects"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("videos")
-        .select("id,status,original_url,output_url,error_msg,created_at")
-        .order("created_at", { ascending: false });
+        .from("projects")
+        .select("id,source_url,source_type,title,duration_sec,status,progress,error_msg,created_at")
+        .order("created_at", { ascending: false })
+        .limit(20);
       if (error) throw error;
-      return (data ?? []) as VideoRow[];
+      return (data ?? []) as unknown as ProjectRow[];
     },
   });
 
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
-      .channel(`videos:${userId}`)
+      .channel(`projects:${userId}`)
       .on("postgres_changes",
-        { event: "*", schema: "public", table: "videos", filter: `user_id=eq.${userId}` },
-        () => qc.invalidateQueries({ queryKey: ["videos"] }),
+        { event: "*", schema: "public", table: "projects", filter: `user_id=eq.${userId}` },
+        () => qc.invalidateQueries({ queryKey: ["projects"] }),
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [userId, qc]);
 
-  async function handleUpload(file: File) {
-    if (!userId) throw new Error("Não autenticado");
-    if ((credits.data ?? 0) <= 0) {
-      toast.error("Sem créditos disponíveis.");
-      throw new Error("no_credits");
-    }
-    if (file.size > 500 * 1024 * 1024) {
-      toast.error("Arquivo maior que 500MB.");
-      throw new Error("too_large");
-    }
-    const ext = file.name.split(".").pop()?.toLowerCase() || "mp4";
-    const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+  async function handleSubmit(url: string) {
+    if (!userId) { toast.error("Não autenticado"); return; }
+    if ((credits.data ?? 0) <= 0) { toast.error("Sem créditos disponíveis."); return; }
     try {
-      const { error: upErr } = await supabase.storage
-        .from("videos-input").upload(path, file, { contentType: file.type || "video/mp4" });
-      if (upErr) throw upErr;
-
-      const { error: credErr } = await supabase.rpc("consume_credit");
-      if (credErr) {
-        await supabase.storage.from("videos-input").remove([path]);
-        throw new Error(credErr.message === "no_credits" ? "Sem créditos." : credErr.message);
-      }
-
-      const { data: inserted, error: insErr } = await supabase
-        .from("videos").insert({ user_id: userId, original_url: path }).select("id").single();
-      if (insErr) throw insErr;
-
-      try {
-        const res = await trigger({ data: { jobId: inserted.id } });
-        if (!res.queued && res.reason === "backend_not_configured") {
-          toast.message("Vídeo enviado", {
-            description: "Backend de processamento ainda não configurado — ficará em pending.",
-          });
-        } else {
-          toast.success("Vídeo enfileirado para processamento.");
-        }
-      } catch (err) {
-        toast.warning("Upload ok, mas o disparo do processamento falhou.", {
-          description: err instanceof Error ? err.message : String(err),
-        });
-      }
-
+      const res = await create({ data: { url } });
       qc.invalidateQueries({ queryKey: ["credits"] });
-      qc.invalidateQueries({ queryKey: ["videos"] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      if (!res.dispatch.dispatched && res.dispatch.reason === "backend_not_configured") {
+        toast.message("Projeto criado", {
+          description: "Worker de processamento ainda não configurado — vai ficar em fila.",
+        });
+      } else if (!res.dispatch.dispatched) {
+        toast.warning("Projeto criado, worker falhou ao receber.", { description: res.dispatch.reason });
+      } else {
+        toast.success("IA começou a trabalhar 🎬");
+      }
+      navigate({ to: "/projects/$id", params: { id: res.id } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha no upload");
-      throw err;
+      toast.error(err instanceof Error ? err.message : "Falha");
     }
   }
 
@@ -123,9 +97,9 @@ function Dashboard() {
             <div className="flex items-center gap-3">
               <SidebarTrigger />
               <div>
-                <h1 className="text-base font-semibold">Vídeos</h1>
+                <h1 className="text-base font-semibold">Novo projeto</h1>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  envie · processe · baixe
+                  link · IA · cortes virais
                 </p>
               </div>
             </div>
@@ -135,23 +109,18 @@ function Dashboard() {
             </div>
           </header>
 
-          <main className="mx-auto w-full max-w-6xl space-y-8 px-6 py-8">
-            <section>
-              <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Enviar vídeo</h2>
-              <UploadDropzone
-                onFile={async (file) => { await handleUpload(file); }}
-                disabled={!userId || (credits.data ?? 0) <= 0}
-              />
-            </section>
+          <main className="mx-auto w-full max-w-5xl space-y-10 px-6 py-8">
+            <UrlInput
+              onSubmit={handleSubmit}
+              disabled={!userId || (credits.data ?? 0) <= 0}
+            />
 
             <section>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-muted-foreground">Seus vídeos</h2>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  tempo real
-                </p>
+                <h2 className="text-sm font-semibold text-muted-foreground">Seus projetos recentes</h2>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">tempo real</p>
               </div>
-              <VideosTable videos={videos.data ?? []} loading={videos.isLoading} />
+              <ProjectsList projects={projects.data ?? []} loading={projects.isLoading} />
             </section>
           </main>
         </SidebarInset>

@@ -7,12 +7,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatusBadge, type VideoStatus } from "@/components/dashboard/status-badge";
+import { ProjectStatusBadge, type ProjectStatus } from "@/components/projects/project-status";
 
 export type UsageRow = {
   id: string;
-  status: VideoStatus;
-  original_url: string;
+  status: ProjectStatus;
+  source_url: string;
+  title: string | null;
   created_at: string;
 };
 
@@ -23,9 +24,9 @@ export function UsageTable({ rows, loading }: { rows: UsageRow[]; loading: boole
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-[180px]">Data</TableHead>
-            <TableHead>Vídeo</TableHead>
+            <TableHead>Projeto</TableHead>
             <TableHead className="w-[160px]">Status</TableHead>
-            <TableHead className="w-[140px] text-right">Créditos</TableHead>
+            <TableHead className="w-[120px] text-right">Créditos</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -46,18 +47,16 @@ export function UsageTable({ rows, loading }: { rows: UsageRow[]; loading: boole
             </TableRow>
           ) : (
             rows.map((r) => {
-              const name = r.original_url.split("/").pop() ?? r.id;
               const date = new Date(r.created_at).toLocaleString("pt-BR");
               return (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{date}</TableCell>
-                  <TableCell className="max-w-[320px]">
-                    <p className="truncate font-mono text-sm">{name}</p>
+                  <TableCell className="max-w-[360px]">
+                    <p className="truncate text-sm">{r.title ?? r.source_url}</p>
+                    <p className="truncate font-mono text-[10px] text-muted-foreground">{r.source_url}</p>
                   </TableCell>
-                  <TableCell><StatusBadge status={r.status} /></TableCell>
-                  <TableCell className="text-right font-mono text-sm text-destructive">
-                    −1
-                  </TableCell>
+                  <TableCell><ProjectStatusBadge status={r.status} /></TableCell>
+                  <TableCell className="text-right font-mono text-sm text-destructive">−1</TableCell>
                 </TableRow>
               );
             })

@@ -14,6 +14,145 @@ export type Database = {
   }
   public: {
     Tables: {
+      clip_renders: {
+        Row: {
+          aspect_ratio: string
+          clip_id: string
+          created_at: string
+          error_msg: string | null
+          id: string
+          output_url: string | null
+          status: string
+          subtitle_style: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio: string
+          clip_id: string
+          created_at?: string
+          error_msg?: string | null
+          id?: string
+          output_url?: string | null
+          status?: string
+          subtitle_style?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string
+          clip_id?: string
+          created_at?: string
+          error_msg?: string | null
+          id?: string
+          output_url?: string | null
+          status?: string
+          subtitle_style?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clip_renders_clip_id_fkey"
+            columns: ["clip_id"]
+            isOneToOne: false
+            referencedRelation: "clips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clips: {
+        Row: {
+          created_at: string
+          end_sec: number
+          hashtags: string[]
+          id: string
+          project_id: string
+          score: number
+          start_sec: number
+          title: string
+          transcript: string | null
+          user_id: string
+          virality_reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          end_sec: number
+          hashtags?: string[]
+          id?: string
+          project_id: string
+          score?: number
+          start_sec: number
+          title: string
+          transcript?: string | null
+          user_id: string
+          virality_reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          end_sec?: number
+          hashtags?: string[]
+          id?: string
+          project_id?: string
+          score?: number
+          start_sec?: number
+          title?: string
+          transcript?: string | null
+          user_id?: string
+          virality_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clips_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          duration_sec: number | null
+          error_msg: string | null
+          id: string
+          progress: number
+          source_type: string
+          source_url: string
+          status: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_sec?: number | null
+          error_msg?: string | null
+          id?: string
+          progress?: number
+          source_type?: string
+          source_url: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_sec?: number | null
+          error_msg?: string | null
+          id?: string
+          progress?: number
+          source_type?: string
+          source_url?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_credits: {
         Row: {
           amount: number
@@ -28,39 +167,6 @@ export type Database = {
         Update: {
           amount?: number
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      videos: {
-        Row: {
-          clips_data: Json | null
-          created_at: string
-          error_msg: string | null
-          id: string
-          original_url: string
-          output_url: string | null
-          status: string
-          user_id: string
-        }
-        Insert: {
-          clips_data?: Json | null
-          created_at?: string
-          error_msg?: string | null
-          id?: string
-          original_url: string
-          output_url?: string | null
-          status?: string
-          user_id: string
-        }
-        Update: {
-          clips_data?: Json | null
-          created_at?: string
-          error_msg?: string | null
-          id?: string
-          original_url?: string
-          output_url?: string | null
-          status?: string
           user_id?: string
         }
         Relationships: []
