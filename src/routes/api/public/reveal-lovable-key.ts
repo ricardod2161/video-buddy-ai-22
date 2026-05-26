@@ -17,12 +17,16 @@ export const Route = createFileRoute('/api/public/reveal-lovable-key')({
           url.searchParams.get('secret') ??
           '';
 
-        const workerSecret = process.env.WORKER_SECRET ?? '';
+        const workerSecret =
+          process.env.WORKER_SECRET ??
+          process.env.criar_video ??
+          process.env.SEGREDO_DO_TRABALHADOR ??
+          '';
         const lovableKey = process.env.LOVABLE_API_KEY ?? '';
 
         if (!workerSecret) {
           return new Response(
-            JSON.stringify({ error: 'WORKER_SECRET not configured on server' }),
+            JSON.stringify({ error: 'Worker secret not configured on server' }),
             { status: 500, headers: { 'Content-Type': 'application/json' } },
           );
         }
