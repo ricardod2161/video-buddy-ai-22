@@ -14,13 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      user_credits: {
+        Row: {
+          amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      videos: {
+        Row: {
+          clips_data: Json | null
+          created_at: string
+          error_msg: string | null
+          id: string
+          original_url: string
+          output_url: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          clips_data?: Json | null
+          created_at?: string
+          error_msg?: string | null
+          id?: string
+          original_url: string
+          output_url?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          clips_data?: Json | null
+          created_at?: string
+          error_msg?: string | null
+          id?: string
+          original_url?: string
+          output_url?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      consume_credit: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never
