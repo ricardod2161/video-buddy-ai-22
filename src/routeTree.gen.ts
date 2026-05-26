@@ -14,6 +14,8 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedCreditsRouteImport } from './routes/_authenticated.credits'
+import { Route as ApiPublicWorkerCallbackRouteImport } from './routes/api/public/worker-callback'
+import { Route as AuthenticatedProjectsIdRouteImport } from './routes/_authenticated.projects.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -39,18 +41,32 @@ const AuthenticatedCreditsRoute = AuthenticatedCreditsRouteImport.update({
   path: '/credits',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicWorkerCallbackRoute = ApiPublicWorkerCallbackRouteImport.update({
+  id: '/api/public/worker-callback',
+  path: '/api/public/worker-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedProjectsIdRoute = AuthenticatedProjectsIdRouteImport.update({
+  id: '/projects/$id',
+  path: '/projects/$id',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/credits': typeof AuthenticatedCreditsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/api/public/worker-callback': typeof ApiPublicWorkerCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/credits': typeof AuthenticatedCreditsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/api/public/worker-callback': typeof ApiPublicWorkerCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -59,12 +75,26 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/credits': typeof AuthenticatedCreditsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/projects/$id': typeof AuthenticatedProjectsIdRoute
+  '/api/public/worker-callback': typeof ApiPublicWorkerCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/credits' | '/dashboard'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/credits'
+    | '/dashboard'
+    | '/projects/$id'
+    | '/api/public/worker-callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/credits' | '/dashboard'
+  to:
+    | '/'
+    | '/login'
+    | '/credits'
+    | '/dashboard'
+    | '/projects/$id'
+    | '/api/public/worker-callback'
   id:
     | '__root__'
     | '/'
@@ -72,12 +102,15 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/credits'
     | '/_authenticated/dashboard'
+    | '/_authenticated/projects/$id'
+    | '/api/public/worker-callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicWorkerCallbackRoute: typeof ApiPublicWorkerCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -117,17 +150,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreditsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/worker-callback': {
+      id: '/api/public/worker-callback'
+      path: '/api/public/worker-callback'
+      fullPath: '/api/public/worker-callback'
+      preLoaderRoute: typeof ApiPublicWorkerCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/projects/$id': {
+      id: '/_authenticated/projects/$id'
+      path: '/projects/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof AuthenticatedProjectsIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
   AuthenticatedCreditsRoute: typeof AuthenticatedCreditsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedProjectsIdRoute: typeof AuthenticatedProjectsIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCreditsRoute: AuthenticatedCreditsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedProjectsIdRoute: AuthenticatedProjectsIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -138,7 +187,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicWorkerCallbackRoute: ApiPublicWorkerCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

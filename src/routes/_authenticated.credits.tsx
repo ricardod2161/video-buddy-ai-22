@@ -42,11 +42,11 @@ function CreditsPage() {
     queryKey: ["usage"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("videos")
-        .select("id,status,original_url,created_at")
+        .from("projects")
+        .select("id,status,source_url,title,created_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as UsageRow[];
+      return (data ?? []) as unknown as UsageRow[];
     },
   });
 
