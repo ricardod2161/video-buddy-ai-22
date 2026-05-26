@@ -176,7 +176,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      consume_credit: { Args: never; Returns: number }
+      consume_credit: { Args: { _user_id: string }; Returns: number }
     }
     Enums: {
       [_ in never]: never
