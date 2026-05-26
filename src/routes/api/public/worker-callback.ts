@@ -64,7 +64,13 @@ export const Route = createFileRoute("/api/public/worker-callback")({
         }
 
         if (parsed.event === "project_progress") {
-          const update: Record<string, unknown> = { status: parsed.status };
+          const update: {
+            status: typeof parsed.status;
+            progress?: number;
+            title?: string;
+            duration_sec?: number;
+            error_msg?: string;
+          } = { status: parsed.status };
           if (parsed.progress !== undefined) update.progress = parsed.progress;
           if (parsed.title) update.title = parsed.title;
           if (parsed.duration_sec !== undefined) update.duration_sec = parsed.duration_sec;
